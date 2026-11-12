@@ -8,7 +8,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
-SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 
 BATCH_SIZE = 500
 TAP_URL = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"
@@ -105,7 +105,7 @@ def normalize(item):
 def main():
     if not SUPABASE_URL or not SERVICE_KEY:
         raise RuntimeError(
-            "Configure SUPABASE_URL e SUPABASE_SERVICE_KEY."
+            "Configure SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY."
         )
 
     processed = 0
