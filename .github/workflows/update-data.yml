@@ -1,0 +1,30 @@
+name: Atualizar dados da NASA
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '20 9 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: exoplanet-archive-update
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Coletar e gravar dados
+        env:
+          # URL não é sensível: configure em Settings > Secrets and variables > Actions > Variables.
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          # A service role é administrativa e deve existir somente como Secret.
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python scripts/fetch_nasa.py

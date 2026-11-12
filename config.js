@@ -1,0 +1,4 @@
+window.SUPABASE_CONFIG = {
+  url: 'URL_DO_SUPABASE',
+  anonKey: 'CHAVE_ANON_OU_PUBLISHABLE',
+};

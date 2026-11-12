@@ -1,0 +1,12 @@
+# Credenciais e configurações locais
+.env
+.env.*
+!env.example
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Artefatos locais
+tmp/
+
