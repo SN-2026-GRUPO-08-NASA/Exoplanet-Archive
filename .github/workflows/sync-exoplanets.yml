@@ -16,6 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
+    env:
+      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+
     steps:
       - name: Baixar repositório
         uses: actions/checkout@v4
@@ -28,33 +32,25 @@ jobs:
       - name: Verificar arquivo
         run: |
           if [ ! -f "./scripts/sync_exoplanets.py" ]; then
-            echo "Erro: sync_exoplanets.py não encontrado na pasta scripts."
-            echo "Arquivos disponíveis:"
-            find . -maxdepth 3 -type f
+            echo "Erro: script não encontrado!"
             exit 1
           fi
 
-          echo "Script encontrado com sucesso!"
+          echo "Script encontrado!"
 
-      - name: Validar Secrets
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      - name: Validar configurações
         run: |
           if [ -z "$SUPABASE_URL" ]; then
-            echo "Erro: SUPABASE_URL não configurada."
+            echo "Erro: SUPABASE_URL não encontrada nas Variables."
             exit 1
           fi
 
           if [ -z "$SUPABASE_SERVICE_KEY" ]; then
-            echo "Erro: SUPABASE_SERVICE_KEY não configurada."
+            echo "Erro: SUPABASE_SERVICE_KEY não encontrada nos Secrets."
             exit 1
           fi
 
-          echo "Secrets configuradas com sucesso!"
+          echo "Credenciais configuradas corretamente!"
 
       - name: Executar sincronização
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: python "./scripts/sync_exoplanets.py"
