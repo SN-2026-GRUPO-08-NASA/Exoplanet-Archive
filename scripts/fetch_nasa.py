@@ -11,7 +11,7 @@ SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 BATCH_SIZE = 500
 TAP_URL = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"
 QUERY = """select pl_name,hostname,discoverymethod,disc_year,pl_orbper,
-pl_rade,pl_bmasse,sy_dist,ra,dec,rowupdate from pscomppars"""
+pl_rade,pl_bmasse,...,sy_dist,ra,dec,disc_pubdate from pscomppars"""
 
 
 def request_json(url, method="GET", payload=None, extra_headers=None):
@@ -45,7 +45,7 @@ def normalize(item):
         "distance_pc": item.get("sy_dist"),
         "ra": item.get("ra"),
         "dec": item.get("dec"),
-        "source_updated_at": item.get("rowupdate"),
+        "source_updated_at": item.get("disc_pubdate"),
         "collected_at": datetime.now(timezone.utc).isoformat(),
     }
 
