@@ -25,21 +25,36 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Localizar script
-        id: script
+      - name: Verificar arquivo
         run: |
-          SCRIPT=$(find . -type f -name "sync_exoplanets.py" -print -quit)
-
-          if [ -z "$SCRIPT" ]; then
-            echo "Script sync_exoplanets.py não encontrado!"
+          if [ ! -f "./scripts/sync_exoplanets.py" ]; then
+            echo "Erro: sync_exoplanets.py não encontrado na pasta scripts."
+            echo "Arquivos disponíveis:"
+            find . -maxdepth 3 -type f
             exit 1
           fi
 
-          echo "path=$SCRIPT" >> "$GITHUB_OUTPUT"
-          echo "Script encontrado: $SCRIPT"
+          echo "Script encontrado com sucesso!"
+
+      - name: Validar Secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ]; then
+            echo "Erro: SUPABASE_URL não configurada."
+            exit 1
+          fi
+
+          if [ -z "$SUPABASE_SERVICE_KEY" ]; then
+            echo "Erro: SUPABASE_SERVICE_KEY não configurada."
+            exit 1
+          fi
+
+          echo "Secrets configuradas com sucesso!"
 
       - name: Executar sincronização
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-        run: python "${{ steps.script.outputs.path }}"
+        run: python "./scripts/sync_exoplanets.py"
