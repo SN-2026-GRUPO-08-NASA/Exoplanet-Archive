@@ -40,19 +40,30 @@ jobs:
 
           echo "Script encontrado!"
 
-      - name: Validar credenciais
+     
+      - name: Testar conexão com Supabase REST
         run: |
-          if [ -z "$SUPABASE_URL" ]; then
-            echo "ERRO: SUPABASE_URL ausente."
+          echo "Testando API REST..."
+
+          HTTP_CODE=$(curl -sS \
+            -o response.json \
+            -w "%{http_code}" \
+            "${SUPABASE_URL}/rest/v1/exoplanetas?select=pl_name&limit=1" \
+            -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}")
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Resposta da API:"
+
+          cat response.json
+
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "Falha na comunicação com Supabase REST."
             exit 1
           fi
 
-          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
-            echo "ERRO: SUPABASE_SERVICE_ROLE_KEY ausente."
-            exit 1
-          fi
+          echo "Conexão com Supabase REST estabelecida!"
 
-          echo "Credenciais disponíveis!"
 
       - name: Executar sincronização
         run: python "./scripts/sync_exoplanets.py"
