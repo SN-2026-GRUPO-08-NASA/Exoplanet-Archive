@@ -18,7 +18,7 @@ jobs:
 
     env:
       SUPABASE_URL: ${{ vars.SUPABASE_URL }}
-      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
     steps:
       - name: Baixar repositório
@@ -29,28 +29,30 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Verificar arquivo
+      - name: Verificar estrutura
         run: |
+          echo "Verificando arquivos..."
+
           if [ ! -f "./scripts/sync_exoplanets.py" ]; then
-            echo "Erro: script não encontrado!"
+            echo "ERRO: script não encontrado!"
             exit 1
           fi
 
           echo "Script encontrado!"
 
-      - name: Validar configurações
+      - name: Validar credenciais
         run: |
           if [ -z "$SUPABASE_URL" ]; then
-            echo "Erro: SUPABASE_URL não encontrada nas Variables."
+            echo "ERRO: SUPABASE_URL ausente."
             exit 1
           fi
 
-          if [ -z "$SUPABASE_SERVICE_KEY" ]; then
-            echo "Erro: SUPABASE_SERVICE_ROLE_KEY não encontrada nos Secrets."
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "ERRO: SUPABASE_SERVICE_ROLE_KEY ausente."
             exit 1
           fi
 
-          echo "Credenciais configuradas corretamente!"
+          echo "Credenciais disponíveis!"
 
       - name: Executar sincronização
         run: python "./scripts/sync_exoplanets.py"
