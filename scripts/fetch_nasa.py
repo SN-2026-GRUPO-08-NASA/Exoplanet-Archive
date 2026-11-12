@@ -11,7 +11,7 @@ SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 BATCH_SIZE = 500
 TAP_URL = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"
 QUERY = """select pl_name,hostname,discoverymethod,disc_year,pl_orbper,
-pl_rade,pl_bmasse,sy_dist,ra,dec,rowupdate from pscomppars"""
+pl_rade,pl_bmasse,sy_dist,ra,dec,disc_pubdate from pscomppars"""
 
 
 def request_json(url, method="GET", payload=None, extra_headers=None):
@@ -34,6 +34,7 @@ def supabase_headers(prefer=None):
 
 
 def normalize(item):
+    publication_date = item.get("disc_pubdate")
     return {
         "pl_name": item["pl_name"],
         "hostname": item.get("hostname"),
@@ -45,7 +46,11 @@ def normalize(item):
         "distance_pc": item.get("sy_dist"),
         "ra": item.get("ra"),
         "dec": item.get("dec"),
-        "source_updated_at": item.get("rowupdate"),
+        # A NASA fornece apenas ano e mês de publicação; usar o primeiro dia
+        # cria um valor válido para a coluna timestamptz do Supabase.
+        "source_updated_at": (
+            f"{publication_date}-01T00:00:00+00:00" if publication_date else None
+        ),
         "collected_at": datetime.now(timezone.utc).isoformat(),
     }
 
