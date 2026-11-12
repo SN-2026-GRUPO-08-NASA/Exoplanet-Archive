@@ -1,21 +1,22 @@
-
 import json
 import os
 import sys
 from datetime import datetime, timezone
 from urllib.parse import urlencode
-from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
-SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get(
+    "SUPABASE_SERVICE_ROLE_KEY", ""
+)
 
 BATCH_SIZE = 500
 TAP_URL = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"
 
 QUERY = """
 SELECT pl_name, hostname, discoverymethod, disc_year,
-pl_orbper, pl_rade, pl_bmasse, sy_dist, ra, dec, disc_pubdate
+       pl_orbper, pl_rade, pl_bmasse, sy_dist,
+       ra, dec, disc_pubdate
 FROM pscomppars
 """
 
@@ -24,9 +25,10 @@ def request_json(url, method="GET", payload=None, extra_headers=None):
     headers = {"Accept": "application/json"}
     headers.update(extra_headers or {})
 
-    body = json.dumps(payload).encode("utf-8") if payload is not None else None
+    body = None
 
-    if body is not None:
+    if payload is not None:
+        body = json.dumps(payload).encode("utf-8")
         headers["Content-Type"] = "application/json"
 
     request = Request(
@@ -41,22 +43,24 @@ def request_json(url, method="GET", payload=None, extra_headers=None):
             content = response.read().decode("utf-8")
             return json.loads(content) if content else None
 
-    except HTTPError as exc:
-        error_body = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(
-            f"HTTP {exc.code}: {error_body}"
-        ) from exc
+    except Exception as exc:
+        if hasattr(exc, "read"):
+            error_body = exc.read().decode(
+                "utf-8", errors="replace"
+            )
+            raise RuntimeError(
+                f"Erro na requisição {method} {url}: {error_body}"
+            ) from exc
 
-    except URLError as exc:
         raise RuntimeError(
-            f"Erro de conexão: {exc.reason}"
+            f"Erro na requisição {method} {url}: {exc}"
         ) from exc
 
 
 def supabase_headers(prefer=None):
     headers = {
-        "apikey": SERVICE_KEY,
-        "Authorization": f"Bearer {SERVICE_KEY}"
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}"
     }
 
     if prefer:
@@ -74,11 +78,18 @@ def normalize_publication_date(value):
     for date_format in ("%Y-%m", "%Y-%m-%d"):
         try:
             date = datetime.strptime(value, date_format)
+
             return date.replace(
                 tzinfo=timezone.utc
             ).isoformat()
+
         except ValueError:
             continue
+
+    print(
+        f"Data de publicação inválida: {value}",
+        file=sys.stderr
+    )
 
     return None
 
@@ -103,9 +114,14 @@ def normalize(item):
 
 
 def main():
-    if not SUPABASE_URL or not SERVICE_KEY:
+    if not SUPABASE_URL:
         raise RuntimeError(
-            "Configure SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY."
+            "SUPABASE_URL não encontrada nas GitHub Variables."
+        )
+
+    if not SUPABASE_SERVICE_ROLE_KEY:
+        raise RuntimeError(
+            "SUPABASE_SERVICE_ROLE_KEY não encontrada nos GitHub Secrets."
         )
 
     processed = 0
@@ -118,19 +134,28 @@ def main():
     executions = f"{SUPABASE_URL}/rest/v1/execucoes"
 
     try:
+        print("Registrando execução no Supabase...")
+
         result = request_json(
             executions,
-            "POST",
-            {"status": "em_andamento"},
-            supabase_headers("return=representation")
+            method="POST",
+            payload={"status": "erro_critico"},
+            extra_headers=supabase_headers("return=representation")
         )
 
-        if not result:
+        if not isinstance(result, list) or not result:
             raise RuntimeError(
-                "Não foi possível registrar a execução no Supabase."
+                "Não foi possível criar o registro de execução."
             )
 
         run = result[0]
+
+        if "id" not in run:
+            raise RuntimeError(
+                "O registro de execução não retornou um ID."
+            )
+
+        print("Consultando NASA Exoplanet Archive...")
 
         params = urlencode({
             "query": QUERY,
@@ -152,12 +177,12 @@ def main():
 
         values = list(records.values())
 
+        print(f"Exoplanetas encontrados: {len(values)}")
+
         endpoint = (
             f"{SUPABASE_URL}/rest/v1/exoplanetas"
             "?on_conflict=pl_name"
         )
-
-        print(f"Registros encontrados: {len(values)}")
 
         for start in range(0, len(values), BATCH_SIZE):
             batch = values[start:start + BATCH_SIZE]
@@ -166,9 +191,9 @@ def main():
             try:
                 request_json(
                     endpoint,
-                    "POST",
-                    batch,
-                    supabase_headers(
+                    method="POST",
+                    payload=batch,
+                    extra_headers=supabase_headers(
                         "resolution=merge-duplicates,return=minimal"
                     )
                 )
@@ -176,7 +201,8 @@ def main():
                 processed += len(batch)
 
                 print(
-                    f"Lote {batches} concluído: {len(batch)} registros."
+                    f"Lote {batches} concluído: "
+                    f"{len(batch)} registros."
                 )
 
             except Exception as exc:
@@ -187,10 +213,11 @@ def main():
                     file=sys.stderr
                 )
 
-        status = "erro_parcial" if errors else "concluido"
-
         if errors:
+            status = "erro_parcial"
             detail = f"{errors} lote(s) falharam."
+        else:
+            status = "concluido"
 
     except Exception as exc:
         status = "erro_critico"
@@ -216,23 +243,27 @@ def main():
             try:
                 request_json(
                     f"{executions}?id=eq.{run['id']}",
-                    "PATCH",
-                    payload,
-                    supabase_headers("return=minimal")
+                    method="PATCH",
+                    payload=payload,
+                    extra_headers=supabase_headers("return=minimal")
                 )
 
+                print("Histórico de execução atualizado.")
+
             except Exception as exc:
+                status = "erro_critico"
+
                 print(
-                    f"Erro ao atualizar histórico: {exc}",
+                    f"Falha ao atualizar histórico: {exc}",
                     file=sys.stderr
                 )
-                status = "erro_critico"
 
     if status != "concluido":
         sys.exit(1)
 
     print(
-        f"Pipeline concluído: {processed} registros "
+        f"Sincronização concluída! "
+        f"{processed} registros processados "
         f"em {batches} lote(s)."
     )
 
