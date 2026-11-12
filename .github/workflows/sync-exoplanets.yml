@@ -14,7 +14,6 @@ jobs:
   sync:
     name: Atualizar banco de exoplanetas
     runs-on: ubuntu-latest
-
     timeout-minutes: 30
 
     steps:
@@ -26,8 +25,21 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Localizar script
+        id: script
+        run: |
+          SCRIPT=$(find . -type f -name "sync_exoplanets.py" -print -quit)
+
+          if [ -z "$SCRIPT" ]; then
+            echo "Script sync_exoplanets.py não encontrado!"
+            exit 1
+          fi
+
+          echo "path=$SCRIPT" >> "$GITHUB_OUTPUT"
+          echo "Script encontrado: $SCRIPT"
+
       - name: Executar sincronização
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-        run: python sync_exoplanets.py
+        run: python "${{ steps.script.outputs.path }}"
