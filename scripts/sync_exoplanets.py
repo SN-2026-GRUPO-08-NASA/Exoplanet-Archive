@@ -26,7 +26,6 @@ def request_json(url, method="GET", payload=None, extra_headers=None):
     headers.update(extra_headers or {})
 
     body = None
-
     if payload is not None:
         body = json.dumps(payload).encode("utf-8")
         headers["Content-Type"] = "application/json"
@@ -46,7 +45,8 @@ def request_json(url, method="GET", payload=None, extra_headers=None):
     except Exception as exc:
         if hasattr(exc, "read"):
             error_body = exc.read().decode(
-                "utf-8", errors="replace"
+                "utf-8",
+                errors="replace"
             )
             raise RuntimeError(
                 f"Erro na requisição {method} {url}: {error_body}"
@@ -78,11 +78,7 @@ def normalize_publication_date(value):
     for date_format in ("%Y-%m", "%Y-%m-%d"):
         try:
             date = datetime.strptime(value, date_format)
-
-            return date.replace(
-                tzinfo=timezone.utc
-            ).isoformat()
-
+            return date.replace(tzinfo=timezone.utc).isoformat()
         except ValueError:
             continue
 
@@ -90,7 +86,6 @@ def normalize_publication_date(value):
         f"Data de publicação inválida: {value}",
         file=sys.stderr
     )
-
     return None
 
 
@@ -116,7 +111,7 @@ def normalize(item):
 def main():
     if not SUPABASE_URL:
         raise RuntimeError(
-            "SUPABASE_URL não encontrada nas GitHub Variables."
+            "SUPABASE_URL não encontrada nos GitHub Secrets."
         )
 
     if not SUPABASE_SERVICE_ROLE_KEY:
@@ -176,7 +171,6 @@ def main():
         }
 
         values = list(records.values())
-
         print(f"Exoplanetas encontrados: {len(values)}")
 
         endpoint = (
@@ -199,7 +193,6 @@ def main():
                 )
 
                 processed += len(batch)
-
                 print(
                     f"Lote {batches} concluído: "
                     f"{len(batch)} registros."
@@ -207,7 +200,6 @@ def main():
 
             except Exception as exc:
                 errors += 1
-
                 print(
                     f"Falha no lote {batches}: {exc}",
                     file=sys.stderr
@@ -247,12 +239,10 @@ def main():
                     payload=payload,
                     extra_headers=supabase_headers("return=minimal")
                 )
-
                 print("Histórico de execução atualizado.")
 
             except Exception as exc:
                 status = "erro_critico"
-
                 print(
                     f"Falha ao atualizar histórico: {exc}",
                     file=sys.stderr
