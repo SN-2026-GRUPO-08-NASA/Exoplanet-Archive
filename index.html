@@ -164,25 +164,36 @@
 
     async function load() {
       try {
-        if (!SUPABASE_URL || SUPABASE_URL.includes('COLE_AQUI')) {
-          throw new Error('Configure as Variables do GitHub e publique o painel pelo workflow.');
+        if (!SUPABASE_URL || !SUPABASE_ANON_KEY || SUPABASE_URL.includes('COLE_AQUI') || SUPABASE_ANON_KEY.includes('COLE_AQUI')) {
+          throw new Error('Configure SUPABASE_URL e SUPABASE_ANON_KEY nas Variables do GitHub e publique pelo workflow. Para teste local, preencha config.js com a URL e a chave publishable/anon.');
+        }
+        if (!/^https:\/\/[^/]+\.supabase\.co\/?$/.test(SUPABASE_URL)) {
+          throw new Error('SUPABASE_URL inválida. Use o formato https://seu-projeto.supabase.co, sem /rest/v1.');
         }
         const headers = {
           apikey: SUPABASE_ANON_KEY,
           Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
         };
-        const [planets, runs] = await Promise.all([
+        const [planetsResponse, runsResponse] = await Promise.all([
           fetch(`${SUPABASE_URL}/rest/v1/exoplanetas?select=pl_name,hostname,discovery_method,discovery_year,orbital_period_days,planet_radius_earth&order=pl_name.asc`, {headers}),
           fetch(`${SUPABASE_URL}/rest/v1/execucoes?select=finished_at,status&status=eq.concluido&order=finished_at.desc&limit=1`, {headers}),
         ]);
-        if (!planets.ok || !runs.ok) {
-          throw new Error('Não foi possível consultar a API REST.');
+        if (!planetsResponse.ok || !runsResponse.ok) {
+          const response = !planetsResponse.ok ? planetsResponse : runsResponse;
+          const endpoint = !planetsResponse.ok ? 'exoplanetas' : 'execucoes';
+          let detail = '';
+          try {
+            const body = await response.json();
+            detail = body.message || body.hint || body.details || '';
+          } catch (_) {
+          }
+          throw new Error(`A API REST recusou a consulta a ${endpoint} (HTTP ${response.status})${detail ? `: ${detail}` : ''}.`);
         }
-        data = await planets.json();
+        data = await planetsResponse.json();
         const methods = [...new Set(data.map(item => item.discovery_method).filter(Boolean))].sort();
         filter.innerHTML += methods.map(item => `<option>${escapeHtml(item)}</option>`).join('');
         document.querySelector('#methods').textContent = methods.length;
-        const latest = (await runs.json())[0];
+        const latest = (await runsResponse.json())[0];
         document.querySelector('#updated').textContent = latest ? new Date(latest.finished_at).toLocaleDateString('pt-BR') : 'sem execução';
         status.textContent = data.length > 200 ? 'Mostrando os primeiros 200 resultados do filtro.' : '';
         show();
