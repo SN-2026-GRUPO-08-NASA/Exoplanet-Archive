@@ -1,54 +1,5 @@
-name: Sincronização de Exoplanetas
-
-on:
-  workflow_dispatch:
-  schedule:
-    - cron: "0 6 * * *"
-
-permissions:
-  contents: read
-
-jobs:
-  sync:
-    name: Atualizar banco de exoplanetas
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    env:
-      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
-      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-
-    steps:
-      - name: Baixar repositório
-        uses: actions/checkout@v4
-
-      - name: Configurar Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Verificar estrutura
-        run: |
-          test -n "$SUPABASE_URL"
-          test -n "$SUPABASE_SERVICE_KEY"
-          test -f "./scripts/fetch_nasa.py"
-
-      - name: Testar conexão com Supabase REST
-        run: |
-          HTTP_CODE=$(curl -sS \
-            -o response.json \
-            -w "%{http_code}" \
-            "${SUPABASE_URL}/rest/v1/exoplanetas?select=pl_name&limit=1" \
-            -H "apikey: ${SUPABASE_SERVICE_KEY}" \
-            -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}")
-
-          echo "HTTP Status: $HTTP_CODE"
-          cat response.json
-
-          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
-            echo "Falha na comunicação com Supabase REST."
-            exit 1
-          fi
-
-      - name: Executar sincronização
-        run: python "./scripts/fetch_nasa.py"
+- name: Coletar e gravar dados
+  env:
+    SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+    SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  run: python scripts/sync_exoplanets.py
