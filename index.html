@@ -455,14 +455,32 @@
         if (!/^https:\/\/[^/]+\.supabase\.co\/?$/.test(SUPABASE_URL)) throw new Error('A URL do Supabase está inválida.');
         const headers = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
         const [planetsResponse, runsResponse] = await Promise.all([fetch(`${SUPABASE_URL}/rest/v1/exoplanetas?select=pl_name,hostname,discovery_method,discovery_year,orbital_period_days,planet_radius_earth&order=pl_name.asc`, { headers }), fetch(`${SUPABASE_URL}/rest/v1/execucoes?select=finished_at,status&status=eq.concluido&order=finished_at.desc&limit=1`, { headers })]);
-        if (!planetsResponse.ok || !runsResponse.ok) { const r = !planetsResponse.ok ? planetsResponse : runsResponse; throw new Error(`A API REST recusou a consulta (HTTP ${r.status}).`); }
+        if (!planetsResponse.ok || !runsResponse.ok) {
+          const response = !planetsResponse.ok ? planetsResponse : runsResponse;
+          const table = !planetsResponse.ok ? 'exoplanetas' : 'execucoes';
+          let detail = '';
+          try {
+            const body = await response.json();
+            detail = body.message || body.hint || body.details || '';
+          } catch (_) {
+            
+          }
+          throw new Error(`A consulta à tabela ${table} falhou (HTTP ${response.status})${detail ? `: ${detail}` : ''}.`);
+        }
         data = await planetsResponse.json();
         const methods = [...new Set(data.map(i => i.discovery_method).filter(Boolean))].sort();
         filter.innerHTML += methods.map(i => `<option value="${escapeHtml(i)}">${escapeHtml(i)}</option>`).join('');
         document.querySelector('#methods').textContent = methods.length.toLocaleString('pt-BR');
         const latest = (await runsResponse.json())[0]; document.querySelector('#updated').textContent = latest ? new Date(latest.finished_at).toLocaleDateString('pt-BR') : '—';
         setStatus(`${data.length.toLocaleString('pt-BR')} exoplanetas carregados com sucesso.`); show();
-      } catch (error) { setStatus(error.message, true); resultInfo.textContent = 'Não foi possível carregar o catálogo.'; rows.innerHTML = '<tr><td class="empty" colspan="6">Verifique a configuração da API e tente novamente.</td></tr>'; }
+      } catch (error) {
+        const message = error instanceof TypeError && error.message === 'Failed to fetch'
+          ? 'Não foi possível alcançar a API. Verifique a URL publicada e a conexão.'
+          : error.message;
+        setStatus(message, true);
+        resultInfo.textContent = 'Não foi possível carregar o catálogo.';
+        rows.innerHTML = '<tr><td class="empty" colspan="6">Verifique a mensagem acima e tente novamente.</td></tr>';
+      }
     }
     filter.addEventListener('change', show); search.addEventListener('input', show); load();
   </script>
